@@ -1,0 +1,18 @@
+# Litestream v0.5+ 配置文件
+# 支持环境变量引用（如 ${VAR}）和默认自动读取的环境变量（LITESTREAM_ACCESS_KEY_ID / LITESTREAM_SECRET_ACCESS_KEY）
+
+# 优雅停机同步配置
+shutdown-sync-timeout: 30s
+shutdown-sync-interval: 500ms
+
+dbs:
+  - path: /data/db/data.sqlite
+    # v0.5.6+: 启动时若本地数据库不存在，自动从远程副本恢复
+    restore-if-db-not-exists: true
+
+    replica:
+      # S3 兼容协议，支持 Cloudflare R2
+      # 可直接通过环境变量 REPLICA_URL 传入完整的 s3:// 链接，或者在此处引用
+      url: ${REPLICA_URL}
+      # v0.5.7+: 自动恢复异常
+      auto-recover: true

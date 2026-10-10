@@ -1,0 +1,29 @@
+version: 2
+
+updates:
+  # 定期检查 Dockerfile 中固定的镜像 tag 与 digest。
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: daily
+    cooldown:
+      default-days: 3
+    open-pull-requests-limit: 5
+    groups:
+      litestream:
+        patterns:
+          - "litestream/litestream"
+      router-base:
+        patterns:
+          - "luqmenul/9router-go"
+
+  # 定期更新 GitHub Actions，避免工作流依赖长期过期。
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      github-actions:
+        patterns:
+          - "*"

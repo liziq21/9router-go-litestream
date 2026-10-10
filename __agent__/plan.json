@@ -1,0 +1,23 @@
+{
+  "schema_version": 1,
+  "items": [
+    {
+      "title": "检查现有 Litestream 配置与变更",
+      "status": "done"
+    },
+    {
+      "title": "定位数据库未复制的根因",
+      "status": "done"
+    },
+    {
+      "title": "实施最小修复并补充测试",
+      "status": "done"
+    },
+    {
+      "title": "运行脚本与构建相关验证",
+      "status": "done"
+    }
+  ],
+  "updated_at": "2026-10-10T07:02:07.294Z",
+  "session_id": "01a12460-3eb5-75b9-8a24-07654ef03c44"
+}

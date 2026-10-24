@@ -39,8 +39,8 @@ assert_contains 'CMD ["9router-go"]' "$GO_DOCKERFILE"
 assert_contains 'CMD ["node", "custom-server.js"]' "$ROUTER_DOCKERFILE"
 assert_contains "    APP_USER=node \\" "$ROUTER_DOCKERFILE"
 assert_contains '    APP_GROUP=node' "$ROUTER_DOCKERFILE"
-assert_contains 'FROM decolua/9router:0.5.104@sha256:5fc7020f3cf1ca6831bffe80314ecab9dde915d27ee3c479a4bb66f45dabbc27' "$ROUTER_DOCKERFILE"
-assert_contains 'FROM luqmenul/9router-go:1.9.14@sha256:e82906a21c77e6bd71e82bbd16119a35c2641c941de7af21a6921176567cac35' "$GO_DOCKERFILE"
+assert_contains 'FROM luqmenul/9router-go:1.9.15@sha256:6f3a591c58bab070aa1e4f0d65d856d0b46715c763409d58fe212359d1387973' "$GO_DOCKERFILE"
+assert_contains 'FROM decolua/9router:0.5.112@sha256:fab111d99b23bde6c8944ca22982603ab0b09e917a0b1e4ce42a24b05753bec9' "$ROUTER_DOCKERFILE"
 
 # The generic example has an explicit app contract but requires the operator to
 # provide LITESTREAM_DB_PATH when replication is enabled.

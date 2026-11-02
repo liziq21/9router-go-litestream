@@ -7,11 +7,22 @@ ROUTER_DOCKERFILE="$ROOT_DIR/Dockerfile.9router"
 GENERIC_DOCKERFILE="$ROOT_DIR/Dockerfile.generic"
 ENTRYPOINT="$ROOT_DIR/entrypoint.sh"
 LITESTREAM_CONFIG="$ROOT_DIR/litestream.yml"
+DELETE_PATCH="$ROOT_DIR/patches/litestream-delete-fallback.patch"
+RESTORE_PATCH="$ROOT_DIR/patches/litestream-restore-parallel.patch"
 
 assert_contains() {
     EXPECTED=$1
     FILE=$2
     if ! grep -Fqx "$EXPECTED" "$FILE"; then
+        echo "Expected '$EXPECTED' in $FILE" >&2
+        exit 1
+    fi
+}
+
+assert_includes() {
+    EXPECTED=$1
+    FILE=$2
+    if ! grep -Fq "$EXPECTED" "$FILE"; then
         echo "Expected '$EXPECTED' in $FILE" >&2
         exit 1
     fi
@@ -43,8 +54,28 @@ assert_contains 'CMD ["9router-go"]' "$GO_DOCKERFILE"
 assert_contains 'CMD ["node", "custom-server.js"]' "$ROUTER_DOCKERFILE"
 assert_contains "    APP_USER=node \\" "$ROUTER_DOCKERFILE"
 assert_contains '    APP_GROUP=node' "$ROUTER_DOCKERFILE"
+assert_contains 'FROM golang:1.24-alpine@sha256:8bee1901f1e530bfb4a7850aa7a479d17ae3a18beb6e09064ed54cfd245b7191 AS litestream_bin' "$GO_DOCKERFILE"
+assert_contains 'FROM golang:1.24-alpine@sha256:8bee1901f1e530bfb4a7850aa7a479d17ae3a18beb6e09064ed54cfd245b7191 AS litestream_bin' "$ROUTER_DOCKERFILE"
+assert_contains 'FROM golang:1.24-alpine@sha256:8bee1901f1e530bfb4a7850aa7a479d17ae3a18beb6e09064ed54cfd245b7191 AS litestream_bin' "$GENERIC_DOCKERFILE"
+assert_includes 'ADD https://github.com/benbjohnson/litestream/archive/ccd326c175b583b5e82893a6078f06dcef5fba3f.tar.gz' "$GO_DOCKERFILE"
+assert_includes 'COPY patches/litestream-delete-fallback.patch' "$GO_DOCKERFILE"
+assert_includes 'COPY patches/litestream-restore-parallel.patch' "$GO_DOCKERFILE"
+assert_includes 'go build -trimpath' "$GO_DOCKERFILE"
+for PROFILE_DOCKERFILE in "$GO_DOCKERFILE" "$ROUTER_DOCKERFILE" "$GENERIC_DOCKERFILE"; do
+    assert_includes 'COPY patches/litestream-delete-fallback.patch' "$PROFILE_DOCKERFILE"
+    assert_includes 'COPY patches/litestream-restore-parallel.patch' "$PROFILE_DOCKERFILE"
+    assert_includes 'go build -trimpath' "$PROFILE_DOCKERFILE"
+done
 assert_contains 'FROM luqmenul/9router-go:1.9.15@sha256:6f3a591c58bab070aa1e4f0d65d856d0b46715c763409d58fe212359d1387973' "$GO_DOCKERFILE"
 assert_contains 'FROM decolua/9router:0.5.112@sha256:fab111d99b23bde6c8944ca22982603ab0b09e917a0b1e4ce42a24b05753bec9' "$ROUTER_DOCKERFILE"
+if ! grep -Fq 'DeleteObject' "$DELETE_PATCH" || ! grep -Fq 'DeleteObjects' "$DELETE_PATCH"; then
+    echo 'Delete fallback patch must cover both S3 delete APIs' >&2
+    exit 1
+fi
+if ! grep -Fq 'errgroup' "$RESTORE_PATCH"; then
+    echo 'Restore patch must use errgroup for parallel level scans' >&2
+    exit 1
+fi
 
 # The generic example has an explicit app contract but requires the operator to
 # provide LITESTREAM_DB_PATH when replication is enabled.
@@ -63,10 +94,10 @@ fi
 assert_contains 'snapshot:' "$LITESTREAM_CONFIG"
 assert_contains '  interval: 1h' "$LITESTREAM_CONFIG"
 assert_contains '  retention: 1h' "$LITESTREAM_CONFIG"
-# Remote deletion remains delegated to the object-store lifecycle policy; the
+# Retention is enabled through the custom single-object delete fallback; the
 # L0 listing check is throttled to reduce requests against capped providers.
 assert_contains 'retention:' "$LITESTREAM_CONFIG"
-assert_contains '  enabled: false' "$LITESTREAM_CONFIG"
+assert_contains '  enabled: true' "$LITESTREAM_CONFIG"
 assert_contains 'l0-retention-check-interval: 1h' "$LITESTREAM_CONFIG"
 
 echo 'configuration tests: PASS'

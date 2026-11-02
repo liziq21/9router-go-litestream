@@ -1,9 +1,20 @@
 # ==========================================
-# 阶段 1: 提取固定版本的 Litestream 二进制文件 (Multi-stage build)
-# Litestream 0.5.17，digest 对应 linux/amd64 + linux/arm64 manifest。
-# 更新版本时请同步更新 tag 与 digest。
+# 阶段 1: 构建固定源码版本的轻量 Litestream 二进制文件 (Multi-stage build)
+# 基于 Litestream v0.5.17，应用本仓库维护的 S3 DeleteObject fallback 和
+# 并行恢复索引扫描补丁。源码 commit 固定，不依赖浮动的 main/latest。
 # ==========================================
-FROM litestream/litestream:0.5.17@sha256:4b02b9859a6b6b4087d8b8944e15f7e984bd7957cba322bbeee38b0e27b9656a AS litestream_bin
+FROM golang:1.24-alpine@sha256:8bee1901f1e530bfb4a7850aa7a479d17ae3a18beb6e09064ed54cfd245b7191 AS litestream_bin
+
+WORKDIR /src
+ADD https://github.com/benbjohnson/litestream/archive/ccd326c175b583b5e82893a6078f06dcef5fba3f.tar.gz /tmp/litestream.tar.gz
+COPY patches/litestream-delete-fallback.patch /tmp/litestream-delete-fallback.patch
+COPY patches/litestream-restore-parallel.patch /tmp/litestream-restore-parallel.patch
+RUN apk add --no-cache patch \
+    && tar -xzf /tmp/litestream.tar.gz --strip-components=1 -C /src \
+    && patch -d /src -p1 < /tmp/litestream-delete-fallback.patch \
+    && patch -d /src -p1 < /tmp/litestream-restore-parallel.patch \
+    && CGO_ENABLED=0 go build -trimpath -ldflags "-s -w -X main.Version=v0.5.17-custom" \
+        -o /usr/local/bin/litestream ./cmd/litestream
 
 # ==========================================
 # 阶段 2: 目标镜像包装

@@ -15,13 +15,15 @@ shutdown-sync-interval: 500ms
 
 # Keep a recent full snapshot so a fresh instance does not need to replay a
 # long L0/L1 history before the application can bind its health-check port.
-# Remote deletion remains delegated to the object-store lifecycle policy below.
 snapshot:
   interval: 1h
   retention: 1h
 
+# The custom Litestream build falls back from DeleteObjects to DeleteObject,
+# which is required by providers that only implement the single-object API.
+# Disable this only when the provider does not permit deleting old objects.
 retention:
-  enabled: false
+  enabled: true
 
 # 默认每 15 秒会执行一次 ListObjectsV2。降低频率以减少有交易上限的
 # S3 兼容存储的请求量；恢复/提高存储端额度仍是解除 403 的必要条件。

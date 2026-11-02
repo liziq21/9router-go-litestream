@@ -1,0 +1,60 @@
+diff --git a/s3/replica_client.go b/s3/replica_client.go
+index 8e877b1..custom 100644
+--- a/s3/replica_client.go
++++ b/s3/replica_client.go
+@@ -1202,6 +1202,29 @@ func encodeObjectIdentifier(v *types.ObjectIdentifier, value smithyxml.Value) error {
+ 	return nil
+ }
+ 
++// deleteLTXFilesIndividually is a compatibility fallback for S3-compatible
++// providers that implement DeleteObject but reject DeleteObjects.
++func (c *ReplicaClient) deleteLTXFilesIndividually(ctx context.Context, objIDs []types.ObjectIdentifier) error {
++	for _, objID := range objIDs {
++		key := aws.ToString(objID.Key)
++		start := time.Now()
++		_, err := c.s3.DeleteObject(ctx, &s3.DeleteObjectInput{
++			Bucket: aws.String(c.Bucket),
++			Key:    objID.Key,
++		})
++		duration := time.Since(start)
++		internal.OperationDurationHistogramVec.WithLabelValues(ReplicaClientType, "DELETE").Observe(duration.Seconds())
++
++		if err != nil {
++			internal.OperationErrorCounterVec.WithLabelValues(ReplicaClientType, "DELETE", "DeleteObject").Inc()
++			return fmt.Errorf("s3: delete object %s: %w", key, err)
++		}
++
++		internal.OperationTotalCounterVec.WithLabelValues(ReplicaClientType, "DELETE").Inc()
++		c.logger.Debug("individual ltx delete completed", "key", key, "duration_ms", duration.Milliseconds())
++	}
++	return nil
++}
+ // DeleteLTXFiles deletes one or more LTX files.
+ func (c *ReplicaClient) DeleteLTXFiles(ctx context.Context, a []*ltx.FileInfo) error {
+ 	if err := c.Init(ctx); err != nil {
+@@ -1237,7 +1260,12 @@ func (c *ReplicaClient) DeleteLTXFiles(ctx context.Context, a []*ltx.FileInfo) error {
+ 		internal.OperationDurationHistogramVec.WithLabelValues(ReplicaClientType, "DELETE").Observe(duration.Seconds())
+ 
+ 		if err != nil {
+-			return fmt.Errorf("s3: delete batch of %d objects: %w", n, err)
++			c.logger.Warn("batch delete failed, trying individual deletes", "count", n, "error", err)
++			if fallbackErr := c.deleteLTXFilesIndividually(ctx, objIDs[:n]); fallbackErr != nil {
++				return fmt.Errorf("s3: delete batch of %d objects: %w; individual fallback: %v", n, err, fallbackErr)
++			}
++			objIDs = objIDs[n:]
++			continue
+ 		}
+ 
+ 		deleted := 0
+@@ -1269,7 +1297,10 @@ func (c *ReplicaClient) DeleteLTXFiles(ctx context.Context, a []*ltx.FileInfo) error {
+ 		}
+ 
+ 		if err := deleteOutputError(out); err != nil {
+-			return err
++			c.logger.Warn("batch delete returned errors, trying individual deletes", "count", n, "error", err)
++			if fallbackErr := c.deleteLTXFilesIndividually(ctx, objIDs[:n]); fallbackErr != nil {
++				return fmt.Errorf("s3: delete batch of %d objects: %w; individual fallback: %v", n, err, fallbackErr)
++			}
+ 		}
+ 
+ 		objIDs = objIDs[n:]

@@ -1,0 +1,34 @@
+diff --git a/replica.go b/replica.go
+--- a/replica.go
++++ b/replica.go
+@@ -16,6 +16,7 @@ import (
+ 	"time"
+ 
+ 	"github.com/superfly/ltx"
++	"golang.org/x/sync/errgroup"
+ 	"golang.org/x/sync/semaphore"
+ 
+ 	"github.com/benbjohnson/litestream/internal"
+@@ -1574,11 +1575,19 @@ func CalcRestorePlan(ctx context.Context, client ReplicaClient, txID ltx.TXID, timestamp time.Time, logger *slog.Logger) ([]*ltx.FileInfo, error) {
+ 	}()
+ 
+ 	for {
++		var group errgroup.Group
++		for _, cursor := range cursors {
++			cursor := cursor
++			group.Go(func() error {
++				return cursor.refresh(currentMax, txID, timestamp)
++			})
++		}
++		if err := group.Wait(); err != nil {
++			return nil, err
++		}
++
+ 		var next *restoreLevelCursor
+ 		for _, cursor := range cursors {
+-			if err := cursor.refresh(currentMax, txID, timestamp); err != nil {
+-				return nil, err
+-			}
+ 			if cursor.candidate == nil {
+ 				continue
+ 			}

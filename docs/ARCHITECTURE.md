@@ -8,6 +8,7 @@ Dockerfile.9router         # 原版 9router + Litestream profile
 Dockerfile.generic         # generic SQLite 示例 profile
 entrypoint.sh              # 两个 profile 共用的 POSIX 入口
 litestream.yml             # 单 SQLite 数据库的 Litestream 配置
+patches/                    # 固定 Litestream 源码的兼容性和恢复性能补丁
 README.md                  # 用户文档和快速开始
 docs/
 ├── PROJECT.md             # 项目定位和设计边界
@@ -25,7 +26,7 @@ tests/
 
 两个 Dockerfile 都使用多阶段构建：
 
-1. 从固定版本的 `litestream/litestream` 阶段提取二进制；
+1. 从固定 commit 的 Litestream v0.5.17 源码构建自定义二进制；
 2. 从固定 digest 的应用镜像开始构建；
 3. 复制共享配置和入口脚本；
 4. 设置 profile 的数据目录、数据库路径、端口和应用用户。
@@ -140,7 +141,11 @@ LITESTREAM_EXPECTED_DB_PATH=/data/db/data.sqlite
 
 配置将完整快照间隔设为 1h，缩短新实例恢复时需要重放的 L0/L1 增量窗口。
 首次恢复仍会先于应用启动，因此部署平台的启动宽限时间必须覆盖远端恢复耗时。
-`retention.enabled: false` 将远端旧 LTX 文件的删除交给对象存储生命周期规则。部署时应为对应副本前缀设置生命周期策略。
+自定义 Litestream 在 S3 批量 `DeleteObjects` 失败时会逐对象调用 `DeleteObject`，因此
+`retention.enabled: true` 可以兼容只实现单对象删除的 provider。snapshot retention 会
+保留最新完整 snapshot，并清理已被高层覆盖的旧 LTX；它不会把 Litestream 副本变成单一
+可独立下载的对象。恢复计划中的各个非 snapshot level 也会并行 LIST，以降低空卷恢复的
+串行等待。
 
 ## 参数边界
 

@@ -45,7 +45,15 @@ docker build -f Dockerfile -t 9router-go-litestream:local .
 docker build -f Dockerfile.9router -t 9router-litestream:local .
 ```
 
-两个 Dockerfile 都固定了应用基础镜像和 Litestream 的 tag/digest，不使用 `latest` 作为构建输入。
+两个 Dockerfile 都固定了应用基础镜像和自定义 Litestream 构建的源码 commit/digest，不使用
+`latest` 作为构建输入。自定义二进制基于 Litestream v0.5.17，额外包含：
+
+- 当对象存储拒绝批量 `DeleteObjects` 但支持单对象 `DeleteObject` 时自动降级删除；
+- 恢复计划的多个 level 并行执行远端 LIST，减少空卷恢复时的串行等待。
+
+自定义构建补丁位于 [`patches/`](patches/)，三个 profile 的 Dockerfile 都从固定 digest 的
+Go builder 编译同一个 Litestream 二进制。由于 builder 需要下载固定 commit 的源码，首次
+构建需要网络；源码和补丁均不使用浮动分支。
 
 ## 环境变量
 
@@ -195,7 +203,18 @@ LITESTREAM_S3_DEBUG=retries,request,response
 `request-with-body` 或 `response-with-body`，因为它们可能暴露请求数据。凭据和完整副本
 URL 不会由入口诊断日志打印。
 
-当前关闭了 Litestream 主动删除远端旧 LTX 文件，清理由对象存储生命周期规则负责。请为副本前缀配置生命周期策略，否则旧文件会持续累积。
+当前默认启用了 Litestream 主动删除远端旧 LTX 文件。自定义 Litestream 已加入批量删除
+失败后的逐对象删除 fallback，以兼容只支持单对象删除的 S3 服务。确认 provider 的
+`DeleteObject` 可用后可以保持：
+
+```yaml
+retention:
+  enabled: true
+```
+
+这会主动清理过期 snapshot 和已被高层 compact 覆盖的旧 LTX 文件，降低之后空卷恢复时
+需要扫描的历史量。Litestream 仍会保留恢复所需的最新 snapshot；不会把整个副本压缩成一个
+可独立下载的单文件。启用前请先在测试 prefix 验证 provider 的单对象删除权限。
 
 ## 数据卷与 SQLite 注意事项
 

@@ -51,6 +51,10 @@ docker run -d \
 
 wait_for_health
 curl --fail --silent --show-error "http://127.0.0.1:${PORT}/touch" >/dev/null
+# The file replica's regular sync interval is one second. Allow the write to
+# reach the replica before stopping the container; otherwise a fast CI runner
+# can remove the only local copy before Litestream has produced a backup.
+sleep 2
 docker stop --time 30 "$NAME" >/dev/null
 docker rm "$NAME" >/dev/null
 

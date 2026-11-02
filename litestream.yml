@@ -2,6 +2,13 @@
 # LITESTREAM_DB_PATH 和 LITESTREAM_REPLICA_URL 由 entrypoint.sh 设置。
 # 凭据可使用 LITESTREAM_* 或标准 AWS_* 环境变量。
 
+# Keep startup and restore diagnostics visible in platform logs. Set
+# LITESTREAM_LOG_LEVEL=debug (or trace) for more detail on a deployment.
+logging:
+  level: info
+  type: text
+  source: true
+
 # 优雅停机同步配置
 shutdown-sync-timeout: 30s
 shutdown-sync-interval: 500ms

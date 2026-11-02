@@ -70,6 +70,7 @@ generic Dockerfile 不设置 `LITESTREAM_DB_PATH` 默认值，确保复制开启
 容器启动
   │
   ├─ 读取 LITESTREAM_MODE、replica URL、数据库路径和配置路径
+  ├─ 输出脱敏启动诊断（路径、权限、磁盘、身份和配置可读性）
   ├─ 创建数据库父目录
   ├─ 处理 Docker CMD positional arguments
   ├─ disabled              ──────> 直接启动应用
@@ -96,6 +97,11 @@ generic replication: LITESTREAM_DB_PATH 必须显式设置
 ```
 
 入口会把最终值导出为 `LITESTREAM_REPLICA_URL` 和 `LITESTREAM_DB_PATH`，供 Litestream 配置文件展开。`DB_PATH` 和 `DATA_DIR/db/data.sqlite` 仅保留给已有 9Router profile 的应用路径兼容，不能作为 generic 复制路径的隐式回退。
+
+`litestream.yml` 默认使用 text 日志并包含源码位置。`LITESTREAM_LOG_LEVEL` 会作为
+`litestream replicate` 的 `-log-level` 参数传递；默认级别为 `info`，排查恢复或对象存储
+问题时可以设为 `debug` 或 `trace`。入口只记录 replica 的 scheme 和凭据是否已配置，
+不会记录完整 replica URL、access key 或 secret key。
 
 ### 三种模式
 

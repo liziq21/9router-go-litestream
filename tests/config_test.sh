@@ -31,6 +31,10 @@ assert_contains "      url: \${LITESTREAM_REPLICA_URL}" "$LITESTREAM_CONFIG"
 assert_contains "MODE=\${LITESTREAM_MODE:-auto}" "$ENTRYPOINT"
 assert_contains "REPLICA=\${LITESTREAM_REPLICA_URL:-\${REPLICA_URL:-}}" "$ENTRYPOINT"
 assert_contains '    auto|required|disabled)' "$ENTRYPOINT"
+assert_contains 'logging:' "$LITESTREAM_CONFIG"
+assert_contains '  level: info' "$LITESTREAM_CONFIG"
+assert_contains '  source: true' "$LITESTREAM_CONFIG"
+assert_contains "EFFECTIVE_LOG_LEVEL=\${LITESTREAM_LOG_LEVEL:-\${LOG_LEVEL:-info}}" "$ENTRYPOINT"
 
 # Profile ports, application images, and pinned digests are explicit.
 assert_contains 'EXPOSE 20130' "$GO_DOCKERFILE"

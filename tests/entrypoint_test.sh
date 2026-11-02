@@ -143,6 +143,35 @@ assert_line 'DB_PATH=' "$LITESTREAM_ENV"
 assert_line "LITESTREAM_DB_PATH=$TMP_DIR/db/data.sqlite" "$LITESTREAM_ENV"
 assert_line 'LITESTREAM_REPLICA_URL=s3://bucket/new-db' "$LITESTREAM_ENV"
 
+# A requested Litestream log level must be passed through without exposing the
+# replica URL or credentials in the diagnostic output.
+DEBUG_ARGS="$TMP_DIR/litestream-debug.args"
+env -u DATA_DIR -u DB_PATH \
+    ARGS_FILE="$DEBUG_ARGS" LITESTREAM_DB_PATH="$TMP_DIR/debug/data.sqlite" \
+    LITESTREAM_REPLICA_URL='s3://bucket/debug-db' LITESTREAM_LOG_LEVEL=debug \
+    LITESTREAM_ACCESS_KEY_ID='test-access-key' \
+    LITESTREAM_SECRET_ACCESS_KEY='test-secret-key' PATH="$BIN_DIR:$PATH" \
+    "$ENTRYPOINT" custom-app >/dev/null 2>"$TMP_DIR/debug.log"
+assert_line '1=replicate' "$DEBUG_ARGS"
+assert_line '2=-config' "$DEBUG_ARGS"
+assert_line '3=/etc/litestream.yml' "$DEBUG_ARGS"
+assert_line '4=-log-level' "$DEBUG_ARGS"
+assert_line '5=debug' "$DEBUG_ARGS"
+assert_line '6=-exec' "$DEBUG_ARGS"
+assert_line "7='custom-app'" "$DEBUG_ARGS"
+if ! grep -Fq '[Entrypoint] startup mode=auto config=/etc/litestream.yml' "$TMP_DIR/debug.log"; then
+    echo 'Expected startup diagnostics in the entrypoint log' >&2
+    exit 1
+fi
+if ! grep -Fq '[Entrypoint] runtime uid=' "$TMP_DIR/debug.log"; then
+    echo 'Expected runtime identity diagnostics in the entrypoint log' >&2
+    exit 1
+fi
+if grep -Eq 'test-access-key|test-secret-key|s3://bucket/debug-db' "$TMP_DIR/debug.log"; then
+    echo 'Credentials and the replica URL must not appear in diagnostic output' >&2
+    exit 1
+fi
+
 # The legacy variable remains supported when the new variable is absent.
 LEGACY_ARGS="$TMP_DIR/legacy.args"
 LEGACY_ENV="$TMP_DIR/legacy.env"

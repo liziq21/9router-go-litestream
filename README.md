@@ -62,6 +62,8 @@ docker build -f Dockerfile.9router -t 9router-litestream:local .
 | `LITESTREAM_SECRET_ACCESS_KEY` | 未设置 | S3 secret key。 |
 | `AWS_ACCESS_KEY_ID` | 未设置 | Litestream 支持的标准 AWS 变量。 |
 | `AWS_SECRET_ACCESS_KEY` | 未设置 | Litestream 支持的标准 AWS 变量。 |
+| `LITESTREAM_LOG_LEVEL` | `info` | Litestream 日志级别；故障排查时可设为 `debug` 或 `trace`。 |
+| `LITESTREAM_S3_DEBUG` | 未设置 | 可选的 AWS SDK S3 调试类别，例如 `retries,request,response`；不要在生产环境启用 `*-with-body`。 |
 
 模式说明：
 
@@ -175,6 +177,23 @@ generic 示例刻意不在 Dockerfile 中设置 `LITESTREAM_DB_PATH`。如果设
 L0/L1 增量历史。首次从远端恢复仍可能受数据库大小、对象存储吞吐和平台
 启动宽限时间影响；生产部署应保留 `/data` 持久卷，并确保平台的启动宽限时间
 覆盖最慢的一次恢复。
+
+入口会在启动时输出不包含凭据和完整副本 URL 的诊断信息，包括最终数据库路径、
+运行用户、目录读写状态、磁盘状态、配置文件可读性和凭据“已配置/未配置”状态。
+启用复制时，应用要等 Litestream 完成恢复初始化后才会启动；如果日志停在
+`attempting restore before replication`，说明应用尚未开始监听健康检查端口，应该优先
+检查对象存储连接、凭据、权限和恢复耗时，而不是应用健康端点本身。
+
+故障排查时可临时增加以下环境变量，然后重新部署：
+
+```text
+LITESTREAM_LOG_LEVEL=debug
+LITESTREAM_S3_DEBUG=retries,request,response
+```
+
+`LITESTREAM_S3_DEBUG` 的请求/响应日志可能包含对象存储地址和错误响应内容；不要使用
+`request-with-body` 或 `response-with-body`，因为它们可能暴露请求数据。凭据和完整副本
+URL 不会由入口诊断日志打印。
 
 当前关闭了 Litestream 主动删除远端旧 LTX 文件，清理由对象存储生命周期规则负责。请为副本前缀配置生命周期策略，否则旧文件会持续累积。
 

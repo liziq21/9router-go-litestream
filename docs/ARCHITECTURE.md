@@ -34,8 +34,8 @@ tests/
 
 | 文件 | 应用镜像 | 默认端口 | 默认命令 | 运行用户 |
 | --- | --- | ---: | --- | --- |
-| `Dockerfile` | `luqmenul/9router-go:1.9.10` | `20130` | `9router-go` | 基础镜像默认用户（当前构建阶段为 root） |
-| `Dockerfile.9router` | `decolua/9router:0.5.95` | `20128` | `node custom-server.js` | `node` |
+| `Dockerfile` | `luqmenul/9router-go:1.9.15` | `20130` | `9router-go` | 基础镜像默认用户（当前构建阶段为 root） |
+| `Dockerfile.9router` | `decolua/9router:0.5.112` | `20128` | `node custom-server.js` | `node` |
 | `Dockerfile.generic` | 固定 digest 的 `python:3.12-alpine` | `8080` | `python /opt/generic-sqlite/app.py` | `sqlite` |
 
 `Dockerfile.generic` 是仓库内可构建、可验证的 generic 示例，不是已经独立发布的黑盒镜像。它选择“仓库内 generic 示例镜像”方案，而不是 base image、runtime layer 或 sidecar：这样能在一个最小变更中验证入口的通用契约、SQLite 生命周期和权限模型；应用命令、端口、用户、数据目录仍由示例 Dockerfile 明确声明。稳定后再单独发布 wrapper 镜像，避免把未定义应用契约的镜像误当成通用产品。

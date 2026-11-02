@@ -6,10 +6,10 @@ FROM litestream/litestream:0.5.17@sha256:4b02b9859a6b6b4087d8b8944e15f7e984bd795
 
 # ==========================================
 # Stage 2: Wrap the official 9Router image.
-# 9Router v0.5.95, pinned to its multi-architecture manifest.
+# 9Router v0.5.112, pinned to its multi-architecture manifest.
 # Keep the tag and manifest digest in sync when upgrading.
 # ==========================================
-FROM decolua/9router:0.5.104@sha256:5fc7020f3cf1ca6831bffe80314ecab9dde915d27ee3c479a4bb66f45dabbc27
+FROM decolua/9router:0.5.112@sha256:fab111d99b23bde6c8944ca22982603ab0b09e917a0b1e4ce42a24b05753bec9
 USER root
 
 # Use the same in-container layout as the 9router-go profile. The upstream

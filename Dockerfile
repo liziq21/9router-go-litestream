@@ -7,10 +7,10 @@ FROM litestream/litestream:0.5.17@sha256:4b02b9859a6b6b4087d8b8944e15f7e984bd795
 
 # ==========================================
 # 阶段 2: 目标镜像包装
-# 9router-go 1.9.10，digest 对应当前多架构 manifest。
+# 9router-go 1.9.15，digest 对应当前多架构 manifest。
 # 更新基础镜像时请同步更新 tag 与 digest。
 # ==========================================
-FROM luqmenul/9router-go:1.9.14@sha256:e82906a21c77e6bd71e82bbd16119a35c2641c941de7af21a6921176567cac35
+FROM luqmenul/9router-go:1.9.15@sha256:6f3a591c58bab070aa1e4f0d65d856d0b46715c763409d58fe212359d1387973
 USER root
 
 # Keep 9router-go's database in the exact path monitored by Litestream.

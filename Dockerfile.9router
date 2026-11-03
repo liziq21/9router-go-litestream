@@ -25,7 +25,8 @@ USER root
 
 # Use the same in-container layout as the 9router-go profile. The upstream
 # image defaults to /app/data, but its database contract is $DATA_DIR/db/data.sqlite.
-ENV NODE_ENV=production \
+ENV LITESTREAM_MODE=required \
+    NODE_ENV=production \
     PORT=20128 \
     HOSTNAME=0.0.0.0 \
     NEXT_TELEMETRY_DISABLED=1 \
@@ -40,6 +41,11 @@ ENV NODE_ENV=production \
 # The upstream image already contains su-exec for its own entrypoint. The
 # shared wrapper uses it so the app and Litestream run as the same user.
 RUN mkdir -p /data/db && chown -R node:node /data
+
+# A replacement container must receive /data from a persistent volume. The
+# declaration also makes a plain `docker restart` durable; hosted platforms
+# still need an explicitly configured persistent disk or remote replica.
+VOLUME ["/data"]
 
 COPY --from=litestream_bin /usr/local/bin/litestream /usr/local/bin/litestream
 COPY litestream.yml /etc/litestream.yml

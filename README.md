@@ -61,7 +61,7 @@ Go builder 编译同一个 Litestream 二进制。由于 builder 需要下载固
 
 | 变量 | 默认值 | 说明 |
 | --- | --- | --- |
-| `LITESTREAM_MODE` | `auto` | `auto`、`required` 或 `disabled`。 |
+| `LITESTREAM_MODE` | 9Router profile 为 `required`；generic 为 `auto` | `auto`、`required` 或 `disabled`。 |
 | `LITESTREAM_REPLICA_URL` | 未设置 | 副本地址，优先于旧变量 `REPLICA_URL`。 |
 | `REPLICA_URL` | 未设置 | 旧版兼容变量，例如 `s3://<BUCKET_NAME>/db?endpoint=https://<ENDPOINT_HOST>`。 |
 | `LITESTREAM_DB_PATH` | 9Router profile 在构建期设置；generic 无默认值 | Litestream 监控的 SQLite 文件。generic profile 启用复制时必须显式提供。 |
@@ -75,9 +75,13 @@ Go builder 编译同一个 Litestream 二进制。由于 builder 需要下载固
 
 模式说明：
 
-- `auto`：设置副本地址时启用复制，否则直接运行应用。默认模式，兼容已有部署；
+- `auto`：设置副本地址时启用复制，否则直接运行应用。共享入口/generic 示例的默认模式，兼容已有部署；
 - `required`：没有副本地址时直接失败，适合生产环境；
 - `disabled`：忽略副本地址，直接运行应用，适合调试或临时恢复。
+
+两个 9Router profile 在镜像内默认使用 `required`，因此没有配置副本时会直接失败，
+而不是启动一个会在容器替换后丢数据的实例。generic 示例仍由共享入口默认使用
+`auto`；生产环境请显式使用 `required`。
 
 两个 9Router profile 在启用复制时会校验 `DATA_DIR`、`DB_PATH` 和 `LITESTREAM_DB_PATH`。不要把它们覆盖到其它路径，否则容器会直接失败，避免产生未备份的数据库。
 
@@ -120,7 +124,8 @@ docker run -d \
   ghcr.io/<YOUR_GITHUB_USERNAME>/9router-litestream:latest
 ```
 
-如果只是本地运行而不需要复制，可以省略 replica 变量；默认 `auto` 模式会直接启动应用。也可以显式设置 `LITESTREAM_MODE=disabled`。
+如果只是本地运行而不需要复制，必须显式设置 `LITESTREAM_MODE=disabled`。不要在生产环境
+通过 `auto` 忽略副本配置；这会让应用直接写入容器文件系统，平台替换实例后数据无法恢复。
 
 ## Docker Compose 示例
 
@@ -180,6 +185,23 @@ generic 示例刻意不在 Dockerfile 中设置 `LITESTREAM_DB_PATH`。如果设
 2. 本地数据库不存在但远端有备份时，先恢复再启动应用；
 3. 本地数据库和远端备份都不存在时，作为首次安装启动并创建新副本；
 4. 容器停止时执行最终同步。
+
+启动日志应至少包含 `[Entrypoint] startup`、`[Litestream] Remote backup enabled.` 和
+Litestream 的复制日志。如果日志只有 `9router-go Proxy ... starting` 而没有这些行，说明
+当前部署没有运行本仓库包装镜像（常见原因是仍使用官方 `luqmenul/9router-go` 镜像，或
+平台覆盖了镜像的 ENTRYPOINT）。请部署本仓库构建并发布的镜像，并确认平台没有覆盖
+ENTRYPOINT/启动容器命令；否则 `LITESTREAM_*` 环境变量不会自动为官方应用镜像增加备份能力。
+
+部署在会清除本地文件系统的托管平台时，必须同时满足以下条件：
+
+1. 使用 `Dockerfile` 构建出的 `9router-go` 镜像（不是官方应用基础镜像）；
+2. 设置 `LITESTREAM_MODE=required`、`LITESTREAM_REPLICA_URL`（或兼容的 `REPLICA_URL`）
+   和对象存储凭据；
+3. 副本地址使用独立的生产 prefix，并确认该 prefix 可读、可写；
+4. 首次部署后检查 Litestream 已完成一次同步，再执行平台重启/替换测试。
+
+镜像还声明了 `/data` 为 Docker volume，普通 Docker `restart` 可以保留本地数据；这不
+能替代托管平台的持久磁盘或远端副本。`VOLUME` 声明也不会让不同实例自动共享数据。
 
 配置同时每小时生成一次完整快照，避免新实例在健康检查前重放过长的
 L0/L1 增量历史。首次从远端恢复仍可能受数据库大小、对象存储吞吐和平台

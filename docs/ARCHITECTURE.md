@@ -37,7 +37,12 @@ tests/
 | --- | --- | ---: | --- | --- |
 | `Dockerfile` | `luqmenul/9router-go:1.9.15` | `20130` | `9router-go` | 基础镜像默认用户（当前构建阶段为 root） |
 | `Dockerfile.9router` | `decolua/9router:0.5.112` | `20128` | `node custom-server.js` | `node` |
-| `Dockerfile.generic` | 固定 digest 的 `python:3.12-alpine` | `8080` | `python /opt/generic-sqlite/app.py` | `sqlite` |
+| `Dockerfile.generic` | 固定 digest 的 `python:3.15-alpine` | `8080` | `python /opt/generic-sqlite/app.py` | `sqlite` |
+
+`Dockerfile` 和 `Dockerfile.9router` 都把 `LITESTREAM_MODE` 的镜像默认值设为
+`required`，并声明 `/data` 为 Docker volume。这样缺少远端副本时会 fail closed，避免
+平台替换容器后才发现数据库只写在临时文件系统；托管平台仍必须配置持久磁盘或远端
+Litestream replica。generic 示例保留共享入口的 `auto` 默认值，便于无复制的契约测试。
 
 `Dockerfile.generic` 是仓库内可构建、可验证的 generic 示例，不是已经独立发布的黑盒镜像。它选择“仓库内 generic 示例镜像”方案，而不是 base image、runtime layer 或 sidecar：这样能在一个最小变更中验证入口的通用契约、SQLite 生命周期和权限模型；应用命令、端口、用户、数据目录仍由示例 Dockerfile 明确声明。稳定后再单独发布 wrapper 镜像，避免把未定义应用契约的镜像误当成通用产品。
 
@@ -90,7 +95,8 @@ Litestream 负责应用子进程生命周期和优雅停机同步。启用 `APP_
 ### 复制模式
 
 ```text
-LITESTREAM_MODE=${LITESTREAM_MODE:-auto}
+共享入口的代码默认值为 `LITESTREAM_MODE=${LITESTREAM_MODE:-auto}`；两个 9Router
+profile 在 Dockerfile 中覆盖为 `required`，generic profile 保持 `auto`。
 LITESTREAM_REPLICA_URL > REPLICA_URL
 LITESTREAM_CONFIG=${LITESTREAM_CONFIG:-/etc/litestream.yml}
 generic replication: LITESTREAM_DB_PATH 必须显式设置
@@ -108,7 +114,7 @@ generic replication: LITESTREAM_DB_PATH 必须显式设置
 
 | 模式 | 行为 |
 | --- | --- |
-| `auto` | 有 replica URL 才复制；没有时直接运行应用。默认模式，兼容已有部署。 |
+| `auto` | 有 replica URL 才复制；没有时直接运行应用。共享入口的兼容默认值；不适合会替换实例的生产部署。 |
 | `required` | 没有 replica URL 时直接失败，适合生产环境。 |
 | `disabled` | 忽略 replica URL，直接运行应用，适合调试和临时操作。 |
 
@@ -158,6 +164,8 @@ Litestream 的 `-exec` 接收一个 shell command string，而 Docker 入口收�
 ### 单容器
 
 当前两个 profile 使用单容器模式，适合只允许一个 Web/worker 容器的托管平台。应用和 Litestream 共享同一个本地持久化卷。
+两个 profile 默认要求 replica 已配置；如果平台会清除本地数据，应把远端副本视为恢复的
+必要条件，而不是只依赖 `/data` 的本地 volume 声明。
 
 ### Sidecar
 

@@ -66,6 +66,10 @@ Litestream、应用基础镜像及多架构 manifest digest 均固定。更新�
 - 多个应用进程同时写入同一个 SQLite 数据库；
 - 将网络文件系统作为 SQLite 数据目录。
 
+两个固定的 9Router profile 默认以 `LITESTREAM_MODE=required` 运行，缺少 replica
+配置时拒绝启动。这是有意的 fail-closed 部署边界：容器本地文件系统不被视为可靠的
+数据库持久化介质。用户若明确需要临时无复制运行，必须设置 `LITESTREAM_MODE=disabled`。
+
 ## 参考项目
 
 - [Litestream Docker guide](https://litestream.io/guides/docker/)：官方同容器和 sidecar 模式；

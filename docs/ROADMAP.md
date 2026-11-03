@@ -16,6 +16,7 @@
 - [x] 在 CI 中发布两个多架构镜像；
 - [x] 用隔离的 Litestream file replica 验证两个 profile 的恢复和停机同步；
 - [x] 使用真实 S3 兼容对象存储验证两个 profile 的恢复和停机同步。
+- [x] 两个 9Router profile 默认要求 Litestream replica，避免无提示地写入临时容器文件系统。
 
 真实 S3 验收已由手动 GitHub Actions run `38340696672` 完成。测试使用本次 run 独立的 `ci/<run-id>/9router-go` 和 `ci/<run-id>/9router` replica prefix，分别验证两个 profile 的构建、健康检查、停机同步、删除本地数据库后的恢复和 marker 持久化。
 

@@ -25,7 +25,8 @@ FROM luqmenul/9router-go:1.9.15@sha256:6f3a591c58bab070aa1e4f0d65d856d0b46715c76
 USER root
 
 # Keep 9router-go's database in the exact path monitored by Litestream.
-ENV DATA_DIR=/data \
+ENV LITESTREAM_MODE=required \
+    DATA_DIR=/data \
     DB_PATH=/data/db/data.sqlite \
     LITESTREAM_DB_PATH=/data/db/data.sqlite \
     LITESTREAM_EXPECTED_DATA_DIR=/data \
@@ -51,6 +52,11 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 
 # 保证数据库目录存在
 RUN mkdir -p /data/db
+
+# A replacement container must receive /data from a persistent volume. The
+# declaration also makes a plain `docker restart` durable; hosted platforms
+# still need an explicitly configured persistent disk or remote replica.
+VOLUME ["/data"]
 
 # 暴露端口（9router-go 默认使用 20130）
 EXPOSE 20130

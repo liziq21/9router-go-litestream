@@ -29,6 +29,8 @@ assert_includes() {
 }
 
 # Both profiles must use the same application and Litestream database path.
+assert_contains "ENV LITESTREAM_MODE=required \\" "$GO_DOCKERFILE"
+assert_contains "ENV LITESTREAM_MODE=required \\" "$ROUTER_DOCKERFILE"
 assert_contains "    DB_PATH=/data/db/data.sqlite \\" "$GO_DOCKERFILE"
 assert_contains "    LITESTREAM_DB_PATH=/data/db/data.sqlite \\" "$GO_DOCKERFILE"
 assert_contains "    LITESTREAM_EXPECTED_DB_PATH=/data/db/data.sqlite \\" "$GO_DOCKERFILE"
@@ -50,6 +52,8 @@ assert_contains "EFFECTIVE_LOG_LEVEL=\${LITESTREAM_LOG_LEVEL:-\${LOG_LEVEL:-info
 # Profile ports, application images, and pinned digests are explicit.
 assert_contains 'EXPOSE 20130' "$GO_DOCKERFILE"
 assert_contains 'EXPOSE 20128' "$ROUTER_DOCKERFILE"
+assert_contains 'VOLUME ["/data"]' "$GO_DOCKERFILE"
+assert_contains 'VOLUME ["/data"]' "$ROUTER_DOCKERFILE"
 assert_contains 'CMD ["9router-go"]' "$GO_DOCKERFILE"
 assert_contains 'CMD ["node", "custom-server.js"]' "$ROUTER_DOCKERFILE"
 assert_contains "    APP_USER=node \\" "$ROUTER_DOCKERFILE"

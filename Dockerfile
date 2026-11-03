@@ -3,7 +3,7 @@
 # 基于 Litestream v0.5.17，应用本仓库维护的 S3 DeleteObject fallback 和
 # 并行恢复索引扫描补丁。源码 commit 固定，不依赖浮动的 main/latest。
 # ==========================================
-FROM golang:1.24-alpine@sha256:8bee1901f1e530bfb4a7850aa7a479d17ae3a18beb6e09064ed54cfd245b7191 AS litestream_bin
+FROM golang:1.27-alpine@sha256:d200d2dd76b03a99b52651fd1325aff7dcd35422c35c01bac56571b0507f3deb AS litestream_bin
 
 WORKDIR /src
 ADD https://github.com/benbjohnson/litestream/archive/ccd326c175b583b5e82893a6078f06dcef5fba3f.tar.gz /tmp/litestream.tar.gz

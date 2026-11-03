@@ -127,6 +127,26 @@ docker run -d \
 如果只是本地运行而不需要复制，必须显式设置 `LITESTREAM_MODE=disabled`。不要在生产环境
 通过 `auto` 忽略副本配置；这会让应用直接写入容器文件系统，平台替换实例后数据无法恢复。
 
+### 没有永久磁盘的平台
+
+平台不提供 `/data` 持久磁盘时，直接省略 `-v ...:/data`；Litestream 会把 `/data` 当作
+临时工作目录，并在每次新实例启动时从 S3 兼容副本恢复。下面是无本地磁盘的 Go profile
+示例：
+
+```sh
+docker run -d \
+  --name 9router-go \
+  --restart unless-stopped \
+  -p 20130:20130 \
+  -e LITESTREAM_MODE=required \
+  -e LITESTREAM_REPLICA_URL="s3://<BUCKET_NAME>/db?endpoint=https://<ENDPOINT_HOST>" \
+  -e LITESTREAM_ACCESS_KEY_ID="<YOUR_ACCESS_KEY_ID>" \
+  -e LITESTREAM_SECRET_ACCESS_KEY="<YOUR_SECRET_ACCESS_KEY>" \
+  ghcr.io/<YOUR_GITHUB_USERNAME>/9router-go-litestream:latest
+```
+
+不要在这类平台上添加只绑定到单个临时实例的匿名卷；它不会跨实例提供可靠恢复。
+
 ## Docker Compose 示例
 
 ```yaml
@@ -200,13 +220,14 @@ ENTRYPOINT/启动容器命令；否则 `LITESTREAM_*` 环境变量不会自动�
 3. 副本地址使用独立的生产 prefix，并确认该 prefix 可读、可写；
 4. 首次部署后检查 Litestream 已完成一次同步，再执行平台重启/替换测试。
 
-镜像还声明了 `/data` 为 Docker volume，普通 Docker `restart` 可以保留本地数据；这不
-能替代托管平台的持久磁盘或远端副本。`VOLUME` 声明也不会让不同实例自动共享数据。
+本镜像不声明 Docker `VOLUME`，因此不要求平台提供永久磁盘。`/data` 只是 Litestream
+恢复出来的本地工作副本；容器被替换后，`restore-if-db-not-exists: true` 会从远端副本
+重新创建数据库。普通 Docker 部署仍可以自行把 `/data` 挂载到 named volume 以减少恢复
+时间，但这只是可选优化，不能替代远端副本。
 
 配置同时每小时生成一次完整快照，避免新实例在健康检查前重放过长的
 L0/L1 增量历史。首次从远端恢复仍可能受数据库大小、对象存储吞吐和平台
-启动宽限时间影响；生产部署应保留 `/data` 持久卷，并确保平台的启动宽限时间
-覆盖最慢的一次恢复。
+启动宽限时间影响；没有永久磁盘的平台尤其要确保启动宽限时间覆盖最慢的一次恢复。
 
 入口会在启动时输出不包含凭据和完整副本 URL 的诊断信息，包括最终数据库路径、
 运行用户、目录读写状态、磁盘状态、配置文件可读性和凭据“已配置/未配置”状态。
@@ -238,10 +259,11 @@ retention:
 需要扫描的历史量。Litestream 仍会保留恢复所需的最新 snapshot；不会把整个副本压缩成一个
 可独立下载的单文件。启用前请先在测试 prefix 验证 provider 的单对象删除权限。
 
-## 数据卷与 SQLite 注意事项
+## 本地工作目录与 SQLite 注意事项
 
-- 使用 Docker named volume、本地 bind mount 或本地块存储；
-- 不要将 SQLite 数据目录放在 NFS、SMB 或其它网络文件系统上；
+- `/data` 是 Litestream 的本地 SQLite 工作目录，不要求持久化挂载；容器替换后由远端 replica 恢复；
+- 如果平台提供本地磁盘，可以挂载 `/data` 作为恢复加速，但不要把它当作唯一备份；
+- 不要将 SQLite 工作目录放在 NFS、SMB 或其它网络文件系统上；
 - 数据库备份应包含 WAL、SHM 和 Litestream 元数据；
 - 同一个 SQLite 数据库只运行一个主要写入实例；
 - 原版 9router 和 9router-go 切换前先停止原进程，避免同时修改相同配置。

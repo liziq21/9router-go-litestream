@@ -53,11 +53,6 @@ RUN chmod +x /usr/local/bin/entrypoint.sh
 # 保证数据库目录存在
 RUN mkdir -p /data/db
 
-# A replacement container must receive /data from a persistent volume. The
-# declaration also makes a plain `docker restart` durable; hosted platforms
-# still need an explicitly configured persistent disk or remote replica.
-VOLUME ["/data"]
-
 # 暴露端口（9router-go 默认使用 20130）
 EXPOSE 20130
 

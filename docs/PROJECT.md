@@ -68,7 +68,8 @@ Litestream、应用基础镜像及多架构 manifest digest 均固定。更新�
 
 两个固定的 9Router profile 默认以 `LITESTREAM_MODE=required` 运行，缺少 replica
 配置时拒绝启动。这是有意的 fail-closed 部署边界：容器本地文件系统不被视为可靠的
-数据库持久化介质。用户若明确需要临时无复制运行，必须设置 `LITESTREAM_MODE=disabled`。
+数据库持久化介质，但不要求平台提供永久磁盘；远端 Litestream replica 是耐久存储。
+用户若明确需要临时无复制运行，必须设置 `LITESTREAM_MODE=disabled`。
 
 ## 参考项目
 

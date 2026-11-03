@@ -40,9 +40,9 @@ tests/
 | `Dockerfile.generic` | 固定 digest 的 `python:3.15-alpine` | `8080` | `python /opt/generic-sqlite/app.py` | `sqlite` |
 
 `Dockerfile` 和 `Dockerfile.9router` 都把 `LITESTREAM_MODE` 的镜像默认值设为
-`required`，并声明 `/data` 为 Docker volume。这样缺少远端副本时会 fail closed，避免
-平台替换容器后才发现数据库只写在临时文件系统；托管平台仍必须配置持久磁盘或远端
-Litestream replica。generic 示例保留共享入口的 `auto` 默认值，便于无复制的契约测试。
+`required`，但不声明 Docker volume。这样缺少远端副本时会 fail closed，同时允许平台
+完全没有永久磁盘：`/data` 是 Litestream 恢复出的本地工作副本，远端 replica 才是耐久
+存储。generic 示例保留共享入口的 `auto` 默认值，便于无复制的契约测试。
 
 `Dockerfile.generic` 是仓库内可构建、可验证的 generic 示例，不是已经独立发布的黑盒镜像。它选择“仓库内 generic 示例镜像”方案，而不是 base image、runtime layer 或 sidecar：这样能在一个最小变更中验证入口的通用契约、SQLite 生命周期和权限模型；应用命令、端口、用户、数据目录仍由示例 Dockerfile 明确声明。稳定后再单独发布 wrapper 镜像，避免把未定义应用契约的镜像误当成通用产品。
 
@@ -88,7 +88,7 @@ generic Dockerfile 不设置 `LITESTREAM_DB_PATH` 默认值，确保复制开启
        └─ litestream replicate -config ... -exec ...
 ```
 
-Litestream 负责应用子进程生命周期和优雅停机同步。启用 `APP_USER` 时，入口会在自身以 root 运行时准备数据目录权限，并通过 `su-exec` 或 `gosu` 让 Litestream 与应用使用同一用户。这样即使 `/data` 被 root 所有的持久化卷覆盖，原版 `9router` 仍然会写入 `/data/db/data.sqlite`。
+Litestream 负责应用子进程生命周期和优雅停机同步。启用 `APP_USER` 时，入口会在自身以 root 运行时准备数据目录权限，并通过 `su-exec` 或 `gosu` 让 Litestream 与应用使用同一用户。`/data` 可以是临时文件系统；如果本地数据库不存在，Litestream 会在应用启动前从远端恢复 `/data/db/data.sqlite`。
 
 ## 环境变量优先级
 
@@ -163,12 +163,14 @@ Litestream 的 `-exec` 接收一个 shell command string，而 Docker 入口收�
 
 ### 单容器
 
-当前两个 profile 使用单容器模式，适合只允许一个 Web/worker 容器的托管平台。应用和 Litestream 共享同一个本地持久化卷。
-两个 profile 默认要求 replica 已配置；如果平台会清除本地数据，应把远端副本视为恢复的
-必要条件，而不是只依赖 `/data` 的本地 volume 声明。
+当前两个 profile 使用单容器模式，适合只允许一个 Web/worker 容器的托管平台。应用和
+Litestream 共享同一个本地工作目录，该目录可以随容器销毁。
+两个 profile 默认要求 replica 已配置；如果平台会清除本地数据，远端副本就是恢复的
+唯一耐久来源，不要求 `/data` 有本地持久卷。
 
 ### Sidecar
 
 Docker 或 Kubernetes 能稳定共享本地卷时，也可以使用官方 Litestream 镜像作为 sidecar。sidecar 更符合“一容器一进程”，但不适用于所有平台，因此不是本仓库当前镜像的默认模式。
 
-SQLite 数据目录应使用本地卷或本地块存储，避免 NFS、SMB 和其它不可靠的网络文件系统。
+如果使用本地缓存卷，SQLite 数据目录应使用本地卷或本地块存储，避免 NFS、SMB 和其它
+不可靠的网络文件系统；没有本地卷时，Litestream 仍可使用临时 `/data` 完成恢复和复制。

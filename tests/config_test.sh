@@ -52,8 +52,11 @@ assert_contains "EFFECTIVE_LOG_LEVEL=\${LITESTREAM_LOG_LEVEL:-\${LOG_LEVEL:-info
 # Profile ports, application images, and pinned digests are explicit.
 assert_contains 'EXPOSE 20130' "$GO_DOCKERFILE"
 assert_contains 'EXPOSE 20128' "$ROUTER_DOCKERFILE"
-assert_contains 'VOLUME ["/data"]' "$GO_DOCKERFILE"
-assert_contains 'VOLUME ["/data"]' "$ROUTER_DOCKERFILE"
+if grep -Fq 'VOLUME ["/data"]' "$GO_DOCKERFILE" ||
+   grep -Fq 'VOLUME ["/data"]' "$ROUTER_DOCKERFILE"; then
+    echo '9Router profiles must not require a local Docker volume; Litestream is the durable store.' >&2
+    exit 1
+fi
 assert_contains 'CMD ["9router-go"]' "$GO_DOCKERFILE"
 assert_contains 'CMD ["node", "custom-server.js"]' "$ROUTER_DOCKERFILE"
 assert_contains "    APP_USER=node \\" "$ROUTER_DOCKERFILE"
